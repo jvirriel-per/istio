@@ -1,0 +1,101 @@
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  namespace: istio-system
+  name: istio-operator
+spec:
+  profile: default
+  meshConfig:
+    # Forzar las politicas de Istio, habilitada
+    disablePolicyChecks: true
+    # Trafico de salida bloqueado habilitado
+    outboundTrafficPolicy:
+      mode: ALLOW_ANY
+
+  components:
+    # # Policy feature
+    policy:
+      enabled: true
+    # Telemetry feature
+    telemetry:
+      enabled: true
+
+    pilot:
+      k8s:
+        resources:
+          limits:
+            cpu: 444m
+            memory: 333Mi
+          requests:
+            cpu: 222m
+            memory: 111Mi
+        readinessProbe:
+          failureThreshold: 44
+          initialDelaySeconds: 11
+          periodSeconds: 22
+          successThreshold: 33
+
+    # Ingress Gateway Internal
+    ingressGateways:
+    - name: istio-ingressgateway
+      enabled: true
+      k8s:
+        service:
+          type: LoadBalancer
+          loadBalancerIP: "__IP_EXTERNAL_ADDRESS__"
+          ports:
+            - port: 15020
+              targetPort: 15020
+              name: status-port
+            - port: 80
+              targetPort: 8080
+              name: http2
+            - port: 443
+              targetPort: 8443
+              name: https
+            - port: 31400
+              targetPort: 31400
+              name: tcp
+              # This is the port where sni routing happens
+            - port: 15443
+              targetPort: 15443
+              name: tls
+        # Seteo del HPA para el Ingress Gateway
+        hpaSpec:
+          maxReplicas: 10
+          minReplicas: 3
+  # Addons Components
+  addonComponents:
+    prometheus:
+      enabled: true
+    # Enable the Kiali deployment for a service mesh observability dashboard
+    kiali:
+      enabled: true
+    # Enable Grafana deployment for analytics and monitoring dashboards
+    grafana:
+      enabled: true
+    # Enable the Jaeger deployment for tracing
+    tracing:
+      enabled: true
+    istiocoredns:
+      enabled: false
+  
+  values:
+    global:
+      # Seguridad de Istio habilitada
+      controlPlaneSecurityEnabled: true
+      # # Habilitar el modo root de Istio Proxy
+      # proxy:
+      #   privileged: true
+    # Para agregar configuraciones adicionales de Ingress Gateway
+    # gateways:
+    #   istio-ingressgateway:
+    #     domain: ""
+    # Configuraciones adicionales de Grafana
+    grafana:
+      persist: true
+      storageClassName: "standard"
+      accessMode: ReadWriteOnce
+      security:
+        # Enable authentication for Grafana
+        enabled: true

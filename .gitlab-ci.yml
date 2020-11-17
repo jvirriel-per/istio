@@ -1,0 +1,317 @@
+---
+variables:
+  DOCKER_DRIVER: overlay
+  DOCKER_HOST: tcp://localhost:2375
+  DOCKER_TLS_CERTDIR: ""
+
+stages:
+  - create_image
+  - install
+  - validate
+
+#-------------- INIT --------------#
+#-------------- Create istio image for each env --------------#
+#--------------  --------------#
+
+create_image_dev:
+  image: google/cloud-sdk:290.0.1-alpine
+  stage: create_image
+  before_script:
+    - echo "$GCP_GKE_SERVICES_ACCOUNT_KEY_DEV" > /tmp/gcloud-service-account.json
+    - gcloud auth activate-service-account
+      --key-file=/tmp/gcloud-service-account.json
+    - gcloud config set project $GCP_PROJECT_ID_DEV
+  script:
+    - export IMAGE_NAME="istio:1.6.8"
+    - |
+        cat << EOF > cloudbuild.yaml 
+        steps:
+        - name: 'gcr.io/cloud-builders/docker' 
+          args: ['build', '-t', 'gcr.io/$GCP_PROJECT_ID_DEV/$IMAGE_NAME', '.'] 
+        images: ['gcr.io/$GCP_PROJECT_ID_DEV/$IMAGE_NAME'] 
+        EOF
+    - cat cloudbuild.yaml    
+    - gcloud builds submit --config cloudbuild.yaml .
+  only:
+    - develop  
+
+create_image_beta:
+  image: google/cloud-sdk:290.0.1-alpine
+  stage: create_image
+  before_script:
+    - echo "$GCP_GKE_SERVICES_ACCOUNT_KEY_BETA" > /tmp/gcloud-service-account.json
+    - gcloud auth activate-service-account
+      --key-file=/tmp/gcloud-service-account.json
+    - gcloud config set project $GCP_PROJECT_ID_BETA
+  script:
+    - export IMAGE_NAME="istio:1.6.8"
+    - |
+        cat << EOF > cloudbuild.yaml 
+        steps:
+        - name: 'gcr.io/cloud-builders/docker' 
+          args: ['build', '-t', 'gcr.io/$GCP_PROJECT_ID_BETA/$IMAGE_NAME', '.'] 
+        images: ['gcr.io/$GCP_PROJECT_ID_BETA/$IMAGE_NAME'] 
+        EOF
+    - gcloud builds submit --config cloudbuild.yaml .
+  only:
+    - release  
+
+create_image_prod:
+  image: google/cloud-sdk:290.0.1-alpine
+  stage: create_image
+  before_script:
+    - echo "$GCP_GKE_SERVICES_ACCOUNT_KEY_PROD" > /tmp/gcloud-service-account.json
+    - gcloud auth activate-service-account
+      --key-file=/tmp/gcloud-service-account.json
+    - gcloud config set project $GCP_PROJECT_ID_PROD
+  script:
+    - export IMAGE_NAME="istio:1.6.8"
+    - |
+        cat << EOF > cloudbuild.yaml 
+        steps:
+        - name: 'gcr.io/cloud-builders/docker' 
+          args: ['build', '-t', 'gcr.io/$GCP_PROJECT_ID_PROD/$IMAGE_NAME', '.'] 
+        images: ['gcr.io/$GCP_PROJECT_ID_PROD/$IMAGE_NAME'] 
+        EOF
+    - gcloud builds submit --config cloudbuild.yaml .   
+  only:
+    - master     
+
+#-------------- END --------------#
+#-------------- Create istio image for each env --------------#
+#--------------  --------------#     
+
+#-------------- INIT --------------#
+#-------------- Installing ISTIO for each env --------------#
+#--------------  --------------#
+install_istio_dev:
+  image: gcr.io/sod-corp-tms-desa/istio:1.6.8
+  stage: install
+  variables:
+    DOMAIN_CRT: ${FALABELLA_COM_CRT}
+    DOMAIN_KEY: ${FALABELLA_COM_KEY}}
+    GRAFANA_HOST: ${GRAFANA_HOST_DEV}
+    GRAFANA_USER: ${GRAFANA_USER_DEV}
+    GRAFANA_PASS: ${GRAFANA_PASS_DEV}
+    KIALI_HOST: ${KIALI_HOST_DEV}
+    KIALI_USER: ${KIALI_USER_DEV}
+    KIALI_PASS: ${KIALI_PASS_DEV}
+    API_GATEWAY_NAME: ${API_GATEWAY_NAME_DEV}
+    API_HOST_EXTERNAL: ${API_HOST_EXTERNAL_DEV}
+    API_HOST_INTERNAL: ${API_HOST_INTERNAL_DEV}
+    BACKEND_HOST_INTERNAL: ${BACKEND_HOST_INTERNAL_DEV}
+    GCP_GKE_SERVICES_ACCOUNT_KEY: ${GCP_GKE_SERVICES_ACCOUNT_KEY_DEV}
+    GCP_PROJECT_ID: ${GCP_PROJECT_ID_DEV}
+    GKE_PROJECT_NAME: ${GKE_PROJECT_NAME_DEV}
+    GKE_ZONE_PROJECT: ${GKE_ZONE_PROJECT_DEV}
+    IP_EXTERNAL_ADDRESS: ${IP_EXTERNAL_ADDRESS_DEV}
+  script:
+    - k8s
+    - set_secrets
+    - set_ns_secrets
+    - install
+  except:
+    variables:
+      - $DISABLE_ISTIO == "true"
+  only:
+    - develop    
+
+install_istio_beta:
+  image: gcr.io/sod-corp-tms-test/istio:1.6.8
+  stage: install
+  variables:
+    DOMAIN_CRT: ${FALABELLA_COM_CRT}
+    DOMAIN_KEY: ${FALABELLA_COM_KEY}}
+    GRAFANA_HOST: ${GRAFANA_HOST_BETA}
+    GRAFANA_USER: ${GRAFANA_USER_BETA}
+    GRAFANA_PASS: ${GRAFANA_PASS_BETA}
+    KIALI_HOST: ${KIALI_HOST_BETA}
+    KIALI_USER: ${KIALI_USER_BETA}
+    KIALI_PASS: ${KIALI_PASS_BETA}
+    API_GATEWAY_NAME: ${API_GATEWAY_NAME_BETA}
+    API_HOST_EXTERNAL: ${API_HOST_EXTERNAL_BETA}
+    API_HOST_INTERNAL: ${API_HOST_INTERNAL_BETA}
+    BACKEND_HOST_INTERNAL: ${BACKEND_HOST_INTERNAL_BETA}
+    GCP_GKE_SERVICES_ACCOUNT_KEY: ${GCP_GKE_SERVICES_ACCOUNT_KEY_BETA}
+    GCP_PROJECT_ID: ${GCP_PROJECT_ID_BETA}
+    GKE_PROJECT_NAME: ${GKE_PROJECT_NAME_BETA}
+    GKE_ZONE_PROJECT: ${GKE_ZONE_PROJECT_BETA}
+    IP_EXTERNAL_ADDRESS: ${IP_EXTERNAL_ADDRESS_BETA}
+  script:
+    - k8s
+    - set_secrets
+    - set_ns_secrets
+    - install
+  except:
+    variables:
+      - $DISABLE_ISTIO == "true"
+  only:
+    - release    
+
+install_istio_prod:
+  image: gcr.io/sod-corp-tms-prod/istio:1.6.8
+  stage: install
+  variables:
+    DOMAIN_CRT: ${FALABELLA_COM_CRT}
+    DOMAIN_KEY: ${FALABELLA_COM_KEY}}
+    GRAFANA_HOST: ${GRAFANA_HOST_PROD}
+    GRAFANA_USER: ${GRAFANA_USER_PROD}
+    GRAFANA_PASS: ${GRAFANA_PASS_PROD}
+    KIALI_HOST: ${KIALI_HOST_PROD}
+    KIALI_USER: ${KIALI_USER_PROD}
+    KIALI_PASS: ${KIALI_PASS_PROD}
+    API_GATEWAY_NAME: ${API_GATEWAY_NAME_PROD}
+    API_HOST_EXTERNAL: ${API_HOST_EXTERNAL_PROD}
+    API_HOST_INTERNAL: ${API_HOST_INTERNAL_PROD}
+    BACKEND_HOST_INTERNAL: ${BACKEND_HOST_INTERNAL_PROD}
+    GCP_GKE_SERVICES_ACCOUNT_KEY: ${GCP_GKE_SERVICES_ACCOUNT_KEY_PROD}
+    GCP_PROJECT_ID: ${GCP_PROJECT_ID_PROD}
+    GKE_PROJECT_NAME: ${GKE_PROJECT_NAME_PROD}
+    GKE_ZONE_PROJECT: ${GKE_ZONE_PROJECT_PROD}
+    IP_EXTERNAL_ADDRESS: ${IP_EXTERNAL_ADDRESS_PROD}
+  script:
+    - k8s
+    - set_secrets
+    - set_ns_secrets
+    - install
+  except:
+    variables:
+      - $DISABLE_ISTIO == "true"
+  only:
+    - master    
+
+#-------------- END --------------#
+#-------------- Installing ISTIO for each env --------------#
+#--------------  --------------#               
+
+#-------------- INIT --------------#
+#-------------- verifying ISTIO for each env --------------#
+#--------------  --------------#
+
+validate_istio_dev:
+  image: gcr.io/sod-corp-tms-desa/istio:1.6.8
+  stage: validate
+  variables:
+    GCP_GKE_SERVICES_ACCOUNT_KEY: ${GCP_GKE_SERVICES_ACCOUNT_KEY_DEV}
+    GCP_PROJECT_ID: ${GCP_PROJECT_ID_DEV}
+    GKE_PROJECT_NAME: ${GKE_PROJECT_NAME_DEV}
+    GKE_ZONE_PROJECT: ${GKE_ZONE_PROJECT_DEV}
+  script:
+    - k8s
+    - sleep 30
+    - istioctl verify-install
+  except:
+    variables:
+      - $DISABLE_ISTIO == "true"
+  only:
+    - develop    
+
+validate_istio_beta:
+  image: gcr.io/sod-corp-tms-test/istio:1.6.8
+  stage: validate
+  variables:
+    GCP_GKE_SERVICES_ACCOUNT_KEY: ${GCP_GKE_SERVICES_ACCOUNT_KEY_BETA}
+    GCP_PROJECT_ID: ${GCP_PROJECT_ID_BETA}
+    GKE_PROJECT_NAME: ${GKE_PROJECT_NAME_BETA}
+    GKE_ZONE_PROJECT: ${GKE_ZONE_PROJECT_BETA}
+  script:
+    - k8s
+    - sleep 30
+    - istioctl verify-install
+  except:
+    variables:
+      - $DISABLE_ISTIO == "true"
+  only:
+    - release    
+
+validate_istio_prod:
+  image: gcr.io/sod-corp-tms-prod/istio:1.6.8
+  stage: validate
+  variables:
+    GCP_GKE_SERVICES_ACCOUNT_KEY: ${GCP_GKE_SERVICES_ACCOUNT_KEY_PROD}
+    GCP_PROJECT_ID: ${GCP_PROJECT_ID_PROD}
+    GKE_PROJECT_NAME: ${GKE_PROJECT_NAME_PROD}
+    GKE_ZONE_PROJECT: ${GKE_ZONE_PROJECT_PROD}
+  script:
+    - k8s
+    - sleep 30
+    - istioctl verify-install
+  except:
+    variables:
+      - $DISABLE_ISTIO == "true"
+  only:
+    - master            
+
+#-------------- END --------------#
+#-------------- verifying ISTIO for each env --------------#
+#--------------  --------------#      
+
+.script_exec: &script_exec |
+ [[ "$TRACE" ]] && set -x
+  
+ function k8s() {
+    echo "$GCP_GKE_SERVICES_ACCOUNT_KEY" > /tmp/gke-token.json
+    gcloud auth activate-service-account --key-file=/tmp/gke-token.json
+    rm -rf /tmp/gke-toke.json
+    gcloud config set project $GCP_PROJECT_ID
+    gcloud config set container/cluster $GKE_PROJECT_NAME
+    gcloud config set compute/zone $GKE_ZONE_PROJECT
+    gcloud container clusters get-credentials $GKE_PROJECT_NAME --zone $GKE_ZONE_PROJECT
+  }
+
+  function set_ns_secrets() {
+    kubectl cluster-info
+    # Crear el namespace si no existe
+    kubectl create namespace istio-system || true
+    kubectl create namespace $API_NAMESPACE || true
+    kubectl apply -f ./grafana/grafana-secret.yaml
+    kubectl apply -f ./kiali/kiali-secret.yaml
+    kubectl create secret tls istio-ingressgateway-certs --cert=../$CI_PROJECT_NAME.tmp/certificate.crt --key=../$CI_PROJECT_NAME.tmp/key.key -n istio-system || true
+  }
+
+  function set_secrets() {
+      sed -i 's|__IP_EXTERNAL_ADDRESS__|'${IP_EXTERNAL_ADDRESS}'|' ./istio-operator.yml
+      sed -i 's|__GRAFANA_HOST__|'${GRAFANA_HOST}'|' ./grafana/grafana-gateway.yaml
+      sed -i 's|__GRAFANA_USER__|'${GRAFANA_USER}'|' ./grafana/grafana-secret.yaml
+      sed -i 's|__GRAFANA_PASS__|'${GRAFANA_PASS}'|' ./grafana/grafana-secret.yaml
+      sed -i 's|__KIALI_HOST__|'${KIALI_HOST}'|' ./kiali/kiali-gateway.yaml
+      sed -i 's|__KIALI_USER__|'${KIALI_USER}'|' ./kiali/kiali-secret.yaml
+      sed -i 's|__KIALI_PASS__|'${KIALI_PASS}'|' ./kiali/kiali-secret.yaml
+      sed -i 's|__API_GATEWAY_NAME__|'${API_GATEWAY_NAME}'|' ./api/api-gateway.yaml
+      sed -i 's|__API_HOST__EXTERNAL__|'${API_HOST_EXTERNAL}'|' ./api/api-gateway.yaml
+    #  sed -i 's|__API_HOST__INTERNAL__|'${API_HOST_INTERNAL}'|' ./api/api-gateway.yaml
+    #  sed -i 's|__BACKEND_HOST_INTERNAL__|'${BACKEND_HOST_INTERNAL}'|' ./api/service-entry-domain.yaml
+  }
+
+  function install() {
+    istioctl install -f istio-operator.yml 
+    kubectl apply -n $API_NAMESPACE -f ./api
+    #kubectl apply -f istio-envoy-filter-headers.yaml
+    # kubectl apply -f ./grafana/grafana-gateway.yaml
+    # kubectl apply -f ./kiali/kiali-gateway.yaml
+    kubectl -n istio-system apply -f mtls-strict/peer-auth.yaml
+   }
+
+
+before_script:
+  - |
+    if [ $CI_COMMIT_REF_SLUG == "develop" ]
+      then 
+        echo "$GCP_GKE_SERVICES_ACCOUNT_KEY_DEV" > /tmp/gcloud-service-account.json
+    fi    
+    if [ $CI_COMMIT_REF_SLUG == "release" ]
+      then 
+        echo "$GCP_GKE_SERVICES_ACCOUNT_KEY_BETA" > /tmp/gcloud-service-account.json
+    else
+        echo "$GCP_GKE_SERVICES_ACCOUNT_KEY_PROD" > /tmp/gcloud-service-account.json
+    fi        
+  - docker login -u _json_key --password-stdin https://gcr.io < /tmp/gcloud-service-account.json
+  - echo "$WILDCARD_COM_CRT" | base64 -d > ../$CI_PROJECT_NAME.tmp/certificate.crt
+  - echo "$WILDCARD_COM_KEY" | base64 -d > ../$CI_PROJECT_NAME.tmp/key.key
+  - *script_exec
+
+after_script:
+    - rm /tmp/gke-token.json
+    - rm /tmp/gcloud-service-account.json
+
+

@@ -1,0 +1,27 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: "__API_GATEWAY_NAME__"
+spec:
+  selector:
+    istio: ingressgateway # use Istio default gateway implementation
+  servers:
+  - port:
+      number: 80
+      name: http2
+      protocol: HTTP
+    hosts:
+    - "__API_HOST__EXTERNAL__"
+    tls:
+      httpsRedirect: true # sends 301 redirect for http requests
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    hosts:
+    - "__API_HOST__EXTERNAL__"
+    tls:
+      mode: SIMPLE
+      credentialName: istio-ingressgateway-certs
+      # serverCertificate: /etc/istio/ingressgateway-certs/tls.crt
+      # privateKey: /etc/istio/ingressgateway-certs/tls.key
