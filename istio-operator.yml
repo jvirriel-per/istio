@@ -73,7 +73,7 @@ spec:
       enabled: true
     # Enable Grafana deployment for analytics and monitoring dashboards
     grafana:
-      enabled: true
+      enabled: false
     # Enable the Jaeger deployment for tracing
     tracing:
       enabled: true

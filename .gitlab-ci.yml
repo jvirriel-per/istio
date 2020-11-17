@@ -264,16 +264,16 @@ validate_istio_prod:
     # Crear el namespace si no existe
     kubectl create namespace istio-system || true
     kubectl create namespace $API_NAMESPACE || true
-    kubectl apply -f ./grafana/grafana-secret.yaml
+    #kubectl apply -f ./grafana/grafana-secret.yaml
     kubectl apply -f ./kiali/kiali-secret.yaml
     kubectl create secret tls istio-ingressgateway-certs --cert=../$CI_PROJECT_NAME.tmp/certificate.crt --key=../$CI_PROJECT_NAME.tmp/key.key -n istio-system || true
   }
 
   function set_secrets() {
       sed -i 's|__IP_EXTERNAL_ADDRESS__|'${IP_EXTERNAL_ADDRESS}'|' ./istio-operator.yml
-      sed -i 's|__GRAFANA_HOST__|'${GRAFANA_HOST}'|' ./grafana/grafana-gateway.yaml
-      sed -i 's|__GRAFANA_USER__|'${GRAFANA_USER}'|' ./grafana/grafana-secret.yaml
-      sed -i 's|__GRAFANA_PASS__|'${GRAFANA_PASS}'|' ./grafana/grafana-secret.yaml
+     # sed -i 's|__GRAFANA_HOST__|'${GRAFANA_HOST}'|' ./grafana/grafana-gateway.yaml
+      #sed -i 's|__GRAFANA_USER__|'${GRAFANA_USER}'|' ./grafana/grafana-secret.yaml
+      #sed -i 's|__GRAFANA_PASS__|'${GRAFANA_PASS}'|' ./grafana/grafana-secret.yaml
       sed -i 's|__KIALI_HOST__|'${KIALI_HOST}'|' ./kiali/kiali-gateway.yaml
       sed -i 's|__KIALI_USER__|'${KIALI_USER}'|' ./kiali/kiali-secret.yaml
       sed -i 's|__KIALI_PASS__|'${KIALI_PASS}'|' ./kiali/kiali-secret.yaml
@@ -288,7 +288,7 @@ validate_istio_prod:
     kubectl apply -n $API_NAMESPACE -f ./api
     #kubectl apply -f istio-envoy-filter-headers.yaml
     # kubectl apply -f ./grafana/grafana-gateway.yaml
-    # kubectl apply -f ./kiali/kiali-gateway.yaml
+    kubectl apply -f ./kiali/kiali-gateway.yaml
     kubectl -n istio-system apply -f mtls-strict/peer-auth.yaml
    }
 
